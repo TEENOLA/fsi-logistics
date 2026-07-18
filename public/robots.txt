@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /international
+
+Sitemap: https://fsilogistics.com/sitemap.xml

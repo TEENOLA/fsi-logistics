@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Poppins", sans-serif;
+  --font-body: "Work Sans", sans-serif;
+  --font-mono: "Roboto Mono", monospace;
+
+  --color-magenta: #E5006D;
+  --color-magenta-dark: #B80057;
+  --color-green: #1FA74A;
+  --color-gold: #F6B300;
+  --color-ink: #1B1B1B;
+  --color-paper: #FFFFFF;
+  --color-mist: #FCF2F7;
+  --color-mist-dark: #F6E9F0;
+
+  --animate-marquee: marquee 30s linear infinite;
+  --animate-draw: draw 2s ease forwards;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes draw {
+  from { stroke-dashoffset: 1000; }
+  to { stroke-dashoffset: 0; }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+::selection {
+  background: var(--color-magenta);
+  color: white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
