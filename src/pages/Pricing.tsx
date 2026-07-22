@@ -5,12 +5,17 @@ import { waLink } from "../data/brand";
 import Seo from "../components/Seo";
 
 type DeliveryType = "Express" | "Standard" | "Air Freight" | "Sea Freight";
+type CourierId = "DHL" | "FedEx" | "UPS" | "Aramex";
 
 const RATES: Record<
   DeliveryType,
   { perKg: number; base: number; note: string }
 > = {
-  Standard: { perKg: 800, base: 1500, note: "Nationwide, 2–4 business days" },
+  Standard: {
+    perKg: 800,
+    base: 1500,
+    note: "Nationwide, 2–4 business days · handled in-house",
+  },
   Express: {
     perKg: 1400,
     base: 2000,
@@ -21,7 +26,42 @@ const RATES: Record<
     base: 8000,
     note: "International, 3–7 business days",
   },
-  "Sea Freight": { perKg: 950, base: 15000, note: "International, 3–6 weeks" },
+  "Sea Freight": {
+    perKg: 950,
+    base: 15000,
+    note: "International, 3–6 weeks · handled in-house",
+  },
+};
+
+// Express and Air Freight shipments go out through third-party courier
+// partners, and each one prices differently. Standard and Sea Freight stay
+// in-house, so no courier selection is needed for those.
+const COURIER_TYPES: DeliveryType[] = ["Express", "Air Freight"];
+
+const COURIERS: Record<
+  CourierId,
+  { multiplier: number; note: string; badge: string }
+> = {
+  DHL: {
+    multiplier: 1.18,
+    note: "Fastest transit times, premium pricing",
+    badge: "bg-[#FFCC00] text-[#D40511]",
+  },
+  FedEx: {
+    multiplier: 1.1,
+    note: "Reliable mid-range pricing",
+    badge: "bg-[#4D148C] text-white",
+  },
+  UPS: {
+    multiplier: 1.14,
+    note: "Strong US & Canada network",
+    badge: "bg-[#351C15] text-[#FFB500]",
+  },
+  Aramex: {
+    multiplier: 0.94,
+    note: "Most affordable, strong Middle East coverage",
+    badge: "bg-[#E4032E] text-white",
+  },
 };
 
 function formatNaira(n: number) {
@@ -33,17 +73,26 @@ export default function Pricing() {
   const [destination, setDestination] = useState("");
   const [weight, setWeight] = useState(5);
   const [type, setType] = useState<DeliveryType>("Standard");
+  const [courier, setCourier] = useState<CourierId>("DHL");
+
+  const usesCourier = COURIER_TYPES.includes(type);
 
   const estimate = useMemo(() => {
     const rate = RATES[type];
-    return rate.base + rate.perKg * weight;
-  }, [type, weight]);
+    const raw = rate.base + rate.perKg * weight;
+    return usesCourier ? raw * COURIERS[courier].multiplier : raw;
+  }, [type, weight, courier, usesCourier]);
 
   const waMessage = `Hello FSI Logistics, I'd like a quote for a shipment.
 Pickup: ${pickup || "-"}
 Destination: ${destination || "-"}
 Weight: ${weight}kg
-Delivery type: ${type}
+Delivery type: ${type}${
+    usesCourier
+      ? `
+Courier partner: ${courier}`
+      : ""
+  }
 Estimated cost: ${formatNaira(estimate)}`;
 
   return (
@@ -119,9 +168,49 @@ Estimated cost: ${formatNaira(estimate)}`;
                   ))}
                 </select>
               </Field>
+
+              {usesCourier && (
+                <Field label="Courier Partner">
+                  <select
+                    value={courier}
+                    onChange={(e) => setCourier(e.target.value as CourierId)}
+                    className="input"
+                  >
+                    {(Object.keys(COURIERS) as CourierId[]).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </div>
 
-            <p className="mt-5 text-xs text-ink/45">{RATES[type].note}</p>
+            {usesCourier && (
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                {(Object.keys(COURIERS) as CourierId[]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCourier(c)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                      COURIERS[c].badge
+                    } ${
+                      courier === c
+                        ? "ring-2 ring-offset-2 ring-black/20"
+                        : "opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="mt-5 text-xs text-ink/45">
+              {RATES[type].note}
+              {usesCourier ? ` · ${courier}: ${COURIERS[courier].note}` : ""}
+            </p>
           </motion.div>
 
           {/* Estimate card */}
@@ -143,7 +232,8 @@ Estimated cost: ${formatNaira(estimate)}`;
                 {formatNaira(estimate)}
               </p>
               <p className="mt-2 text-sm text-ink/55">
-                {type} · {weight}kg
+                {type}
+                {usesCourier ? ` via ${courier}` : ""} · {weight}kg
                 {pickup || destination
                   ? ` · ${pickup || "Pickup"} → ${destination || "Destination"}`
                   : ""}
@@ -154,6 +244,9 @@ Estimated cost: ${formatNaira(estimate)}`;
               <p className="mt-8 text-xs leading-relaxed text-ink/45">
                 Final shipping cost will be confirmed by an FSI Logistics
                 representative.
+                {usesCourier
+                  ? " Courier rates are indicative and may vary with carrier fuel surcharges and customs fees."
+                  : ""}
               </p>
               <a
                 href={waLink(waMessage)}
