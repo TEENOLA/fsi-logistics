@@ -20,7 +20,6 @@
 // addresses for both parties, and Fsi's own account/wallet details — so
 // this function only ever hand-picks the specific fields the tracking page
 // needs (never the raw payload) from either call.
-
 import type { Handler } from "@netlify/functions";
 
 // Defaults to the live API, but can be pointed at Terminal's sandbox
