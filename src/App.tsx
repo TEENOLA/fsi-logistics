@@ -5,6 +5,7 @@ import About from "./pages/About";
 import Services from "./pages/Services";
 import International from "./pages/International";
 import Pricing from "./pages/Pricing";
+import Booking from "./pages/Booking";
 import Tracking from "./pages/Tracking";
 import Contact from "./pages/Contact";
 
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/services" element={<Services />} />
           <Route path="/international" element={<International />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/booking" element={<Booking />} />
           <Route path="/tracking" element={<Tracking />} />
           <Route path="/contact" element={<Contact />} />
         </Route>

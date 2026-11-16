@@ -1,8 +1,17 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Phone, MessageCircle, MapPin, Send } from "lucide-react";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Phone,
+  MessageCircle,
+  MapPin,
+  Send,
+  Mail,
+  CheckCircle2,
+} from "lucide-react";
 import { BRAND, CONTACT_SHIPMENT_TYPES, waLink } from "../data/brand";
 import Seo from "../components/Seo";
+import { isMobileDevice } from "../utils/device";
+import { sendEmailFallback } from "../utils/emailFallback";
 
 function InstagramIcon() {
   return (
@@ -20,14 +29,23 @@ function InstagramIcon() {
   );
 }
 
+const emptyForm = {
+  name: "",
+  email: "",
+  phone: "",
+  shipmentType: CONTACT_SHIPMENT_TYPES[0],
+  message: "",
+};
+
 export default function Contact() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    shipmentType: CONTACT_SHIPMENT_TYPES[0],
-    message: "",
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [isMobile, setIsMobile] = useState(true); // assume mobile until checked, avoids a desktop-styled flash
+  const [sending, setSending] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
 
   const waMessage = `Hello FSI Logistics, my name is ${form.name || "-"}.
 Email: ${form.email || "-"}
@@ -37,6 +55,54 @@ Message: ${form.message || "-"}`;
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => setToast(null), 5000);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (isMobile) {
+      // Mobile: WhatsApp is the smooth path — open it first and
+      // synchronously, since browsers block popups opened after an await.
+      window.open(waLink(waMessage), "_blank", "noopener,noreferrer");
+      showToast("Sent to WhatsApp. We'll reply as soon as we can.");
+
+      const submitted = form;
+      setForm(emptyForm);
+
+      // Silent backup: also email the enquiry so it isn't lost if the
+      // customer never actually hits send inside WhatsApp.
+      try {
+        await sendEmailFallback(submitted);
+      } catch (err) {
+        console.error("Email fallback failed:", err);
+      }
+    } else {
+      // Desktop: WhatsApp Web is unreliable unless already logged in, so
+      // email is the primary path here instead of a silent backup.
+      const submitted = form;
+      setSending(true);
+      try {
+        await sendEmailFallback(submitted);
+        showToast("Message sent. We'll reply as soon as we can.");
+        setForm(emptyForm);
+      } catch (err) {
+        console.error("Email submission failed:", err);
+        showToast(
+          "Something went wrong sending that. Try WhatsApp instead, or call us directly."
+        );
+      } finally {
+        setSending(false);
+      }
+    }
+  }
+
+  function openWhatsAppManually() {
+    window.open(waLink(waMessage), "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -56,8 +122,9 @@ Message: ${form.message || "-"}`;
             Let's get your shipment moving
           </h1>
           <p className="mt-5 text-lg text-ink/55">
-            Send us a message or reach out directly — we usually reply fastest
-            on WhatsApp.
+            {isMobile
+              ? "Send us a message or reach out directly — we usually reply fastest on WhatsApp."
+              : "Send us a message and we'll get back to you shortly."}
           </p>
         </div>
 
@@ -68,7 +135,7 @@ Message: ${form.message || "-"}`;
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5 }}
-            onSubmit={(e) => e.preventDefault()}
+            onSubmit={handleSubmit}
             className="rounded-2xl border border-black/10 bg-white p-7 shadow-sm sm:p-8"
           >
             <div className="grid gap-5 sm:grid-cols-2">
@@ -123,15 +190,32 @@ Message: ${form.message || "-"}`;
               </div>
             </div>
 
-            <a
-              href={waLink(waMessage)}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-6 flex items-center justify-center gap-2 rounded-full bg-magenta px-6 py-3.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
+            <button
+              type="submit"
+              disabled={sending}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-magenta px-6 py-3.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] disabled:opacity-60"
             >
-              <Send className="h-4 w-4" />
-              Send via WhatsApp
-            </a>
+              {isMobile ? (
+                <Send className="h-4 w-4" />
+              ) : (
+                <Mail className="h-4 w-4" />
+              )}
+              {isMobile
+                ? "Send via WhatsApp"
+                : sending
+                ? "Sending…"
+                : "Send Message"}
+            </button>
+
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={openWhatsAppManually}
+                className="mt-3 w-full text-center text-xs font-medium text-ink/50 underline decoration-ink/20 underline-offset-2 hover:text-magenta"
+              >
+                Prefer WhatsApp? Continue there instead
+              </button>
+            )}
           </motion.form>
 
           {/* Business info */}
@@ -199,6 +283,21 @@ Message: ${form.message || "-"}`;
           </motion.div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink px-6 py-3.5 text-sm font-medium text-white shadow-xl shadow-black/20"
+            role="status"
+          >
+            <CheckCircle2 className="h-4.5 w-4.5 text-green" />
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style>{`
         .input {

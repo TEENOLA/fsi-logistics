@@ -14,12 +14,64 @@ export function waLink(message: string) {
 export const WA_DEFAULT_MESSAGE =
   "Hello FSI Logistics, I'd like to inquire about your logistics services.";
 
+// Fsi's own dispatch/hub address — confirmed the same as what's shown on the
+// Contact page. This is always the "pickup" side sent to Terminal for
+// international shipments (Fsi collects locally, then ships from here) —
+// never the customer's own address.
+// TODO: confirm exact zip/postal code with Fsi — left blank for now.
+export const HUB_ADDRESS = {
+  first_name: "FSI",
+  last_name: "Logistics",
+  email: "hello@fsilogistics.ng", // TODO: confirm real dispatch email with Fsi
+  phone: BRAND.phones[0].replace(/\s/g, ""),
+  line1: "Shop A114, Ogba Shopping Mall",
+  line2: "beside Sunday Market",
+  city: "Ogba",
+  state: "Lagos",
+  country: "NG",
+  zip: "",
+};
+
+// The pickup contact Terminal actually needs for a real booking is a
+// deliberate hybrid, per Fsi's explicit decision: the physical address and
+// email stay Fsi's own (since packages are dropped off from Fsi's hub, not
+// the customer's home) — but the name and phone number on the shipment
+// should be the customer's, so carriers (and duty-payment SMS links) reach
+// the right person directly.
+export function buildPickupContact(
+  customerName: string,
+  customerPhone: string
+) {
+  const [firstName, ...rest] = customerName.trim().split(" ");
+  return {
+    ...HUB_ADDRESS,
+    first_name: firstName || HUB_ADDRESS.first_name,
+    last_name: rest.join(" ") || HUB_ADDRESS.last_name,
+    phone: customerPhone || HUB_ADDRESS.phone,
+  };
+}
+
+// Placeholder until Fsi confirms their actual booking fee — this is the one
+// number to update once they decide. Structure (subtotal + separate fee
+// line) is confirmed; the amount is not.
+export const BOOKING_FEE_PERCENTAGE = 0.12;
+
+// Shared across Pricing and Booking — countries with confirmed working
+// Terminal integration during testing. "Other" falls back to manual entry.
+export const COUNTRIES = [
+  { label: "United States", value: "US" },
+  { label: "United Kingdom", value: "GB" },
+  { label: "Canada", value: "CA" },
+  { label: "Other", value: "" },
+];
+
 export const NAV_LINKS = [
   { label: "Home", to: "/" },
   { label: "About", to: "/about" },
   { label: "Services", to: "/services" },
   { label: "International", to: "/international" },
   { label: "Pricing", to: "/pricing" },
+  { label: "Book a Shipment", to: "/booking" },
   { label: "Tracking", to: "/tracking" },
   { label: "Contact", to: "/contact" },
 ];
@@ -38,51 +90,58 @@ export const SERVICES = [
     short:
       "Reliable air and sea freight solutions for businesses and individuals.",
     detail:
-      "We move cargo between Nigeria and the USA, UK, Canada, Europe and other international destinations, with full customs support and door-to-door options.",
-    countries: ["USA", "UK", "Canada", "Europe", "Rest of World"],
+      "We move cargo between Nigeria and destinations including the USA, UK, Canada, Europe and beyond. Every shipment includes full customs documentation, duty guidance, and a choice of door-to-door or hub pickup — so you're never left guessing what happens after handoff.",
   },
   {
     slug: "local-delivery",
     title: "Local Delivery",
     short: "Fast nationwide delivery across Nigeria.",
     detail:
-      "From Lagos to every state in Nigeria, our local network gets packages moving the same day they're booked.",
+      "From Lagos to every state in Nigeria, our local network gets packages moving the same day they're booked. Most deliveries arrive same-day to next-day, with live tracking so you always know exactly where a package is.",
   },
   {
     slug: "express-parcel",
     title: "Express Parcel Delivery",
     short: "Same-day and next-day delivery where available.",
     detail:
-      "For time-critical shipments, our express lane prioritises pickup, handling and delivery ahead of standard freight.",
+      "For time-critical shipments, our express lane prioritises pickup, handling and delivery ahead of standard freight. Ideal for documents, urgent business parcels, or anything that simply can't wait for standard scheduling.",
   },
   {
     slug: "air-freight",
     title: "Air Freight",
-    short: "Fast international shipment.",
+    short: "The fastest way to ship internationally.",
     detail:
-      "Air cargo partnerships across major hubs mean your shipment clears and moves in days, not weeks.",
+      "Air cargo partnerships across major hubs mean your shipment typically clears and arrives within 3–7 business days, door-to-door. The right choice when speed matters more than shipment size — documents, samples, and time-sensitive commercial goods.",
   },
   {
     slug: "sea-freight",
     title: "Sea Freight",
     short: "Affordable shipping for bulk cargo.",
     detail:
-      "For large or heavy shipments, ocean freight offers the most cost-effective route between continents.",
+      "For large or heavy shipments where cost matters more than speed, ocean freight is the most economical route between continents — typically 20–35 days depending on destination and customs processing. Ideal for bulk goods, furniture, and commercial-volume shipments.",
   },
   {
     slug: "import-export",
     title: "Import & Export",
     short: "International import/export logistics.",
     detail:
-      "End-to-end support for businesses moving goods in and out of Nigeria, including documentation and clearance.",
+      "End-to-end support for businesses moving goods in and out of Nigeria — customs documentation, duty calculation, and clearance handled for you, so you can focus on the business side of trade, not the paperwork.",
   },
   {
     slug: "commercial-logistics",
     title: "Commercial Logistics",
     short: "Supply chain solutions for businesses.",
     detail:
-      "Scheduled freight, warehousing coordination and bulk shipment management for growing companies.",
+      "Scheduled freight, warehousing coordination and bulk shipment management for growing companies — built for businesses that ship regularly and need a logistics partner, not just a one-off courier.",
   },
+];
+
+export const INTERNATIONAL_DESTINATIONS = [
+  "USA",
+  "UK",
+  "Canada",
+  "Europe",
+  "Rest of World",
 ];
 
 export const PROCESS_STEPS = [

@@ -22,5 +22,9 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "netlify/functions/book-quote.ts",
+    "netlify/functions/book-confirm.ts"
+  ]
 }

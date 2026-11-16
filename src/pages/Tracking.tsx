@@ -9,6 +9,8 @@ import {
   Bike,
   CheckCircle2,
   Circle,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import { waLink } from "../data/brand";
 import Seo from "../components/Seo";
@@ -22,47 +24,103 @@ const STATUSES = [
   { label: "Delivered", icon: CheckCircle2 },
 ];
 
-const ROUTES = [
-  { from: "Lagos, NG", to: "London, UK" },
-  { from: "Abuja, NG", to: "Toronto, CA" },
-  { from: "Lagos, NG", to: "New York, US" },
-  { from: "Port Harcourt, NG", to: "Dubai, AE" },
-  { from: "Lagos, NG", to: "Accra, GH" },
-];
+// Maps Terminal Africa's own top-level shipment status to a stage index in
+// the STATUSES timeline above. Confirmed against a real populated response:
+// this top-level status is coarser than our six stages (it doesn't
+// distinguish "in transit" from "customs clearance" or "out for delivery"),
+// so those two extra stages will only ever show as reached once the
+// shipment is fully delivered — there isn't a distinct signal for them at
+// this level. The individual `events` below have their own status codes,
+// but those are carrier-specific (not a shared enum), so they're shown as
+// a supplementary detail list rather than used to pick a more granular
+// stage.
+const STATUS_TO_STAGE: Record<string, number> = {
+  draft: 0,
+  pending: 0,
+  confirmed: 1,
+  "in-transit": 2,
+  delivered: 5,
+};
 
-function hashCode(str: string) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
+interface TrackingEvent {
+  description: string | null;
+  location: string | null;
+  createdAt: string | null;
 }
 
-function mockResult(trackingNumber: string) {
-  const hash = hashCode(trackingNumber.trim().toUpperCase());
-  const stepIndex = hash % STATUSES.length;
-  const route = ROUTES[hash % ROUTES.length];
-  return { stepIndex, route };
+interface TrackingApiResponse {
+  status: string | null;
+  carrierName: string | null;
+  pickupDate: string | null;
+  deliveryDate: string | null;
+  carrierTrackingNumber: string | null;
+  carrierTrackingUrl: string | null;
+  events: TrackingEvent[];
 }
+
+type LookupState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "not-found" }
+  | { kind: "error"; message: string }
+  | { kind: "cancelled" }
+  | { kind: "found"; data: TrackingApiResponse };
 
 export default function Tracking() {
   const [value, setValue] = useState("");
-  const [result, setResult] = useState<ReturnType<typeof mockResult> | null>(
-    null
-  );
   const [submitted, setSubmitted] = useState("");
+  const [state, setState] = useState<LookupState>({ kind: "idle" });
 
-  function handleTrack(e: React.FormEvent) {
+  async function handleTrack(e: React.FormEvent) {
     e.preventDefault();
-    if (!value.trim()) return;
-    setResult(mockResult(value));
-    setSubmitted(value.trim().toUpperCase());
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    setSubmitted(trimmed.toUpperCase());
+    setState({ kind: "loading" });
+
+    try {
+      const res = await fetch(
+        `/.netlify/functions/track-shipment?number=${encodeURIComponent(
+          trimmed
+        )}`
+      );
+
+      if (res.status === 404) {
+        setState({ kind: "not-found" });
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setState({
+          kind: "error",
+          message: body?.error || "Something went wrong looking that up.",
+        });
+        return;
+      }
+
+      const data: TrackingApiResponse = await res.json();
+
+      if (data.status === "cancelled") {
+        setState({ kind: "cancelled" });
+        return;
+      }
+
+      setState({ kind: "found", data });
+    } catch (err) {
+      console.error("Tracking lookup failed:", err);
+      setState({
+        kind: "error",
+        message:
+          "Couldn't reach our tracking service. Please try again shortly.",
+      });
+    }
   }
 
-  const progressPct = result
-    ? (result.stepIndex / (STATUSES.length - 1)) * 100
-    : 0;
+  const stageIndex =
+    state.kind === "found" ? STATUS_TO_STAGE[state.data.status ?? ""] ?? 0 : 0;
+  const progressPct = (stageIndex / (STATUSES.length - 1)) * 100;
 
   return (
     <div className="pt-32 pb-24">
@@ -100,14 +158,87 @@ export default function Tracking() {
           </div>
           <button
             type="submit"
-            className="shrink-0 rounded-full bg-magenta px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-magenta/20 transition-transform hover:scale-[1.02]"
+            disabled={state.kind === "loading"}
+            className="shrink-0 rounded-full bg-magenta px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-magenta/20 transition-transform hover:scale-[1.02] disabled:opacity-60"
           >
-            Track Shipment
+            {state.kind === "loading" ? "Searching…" : "Track Shipment"}
           </button>
         </form>
 
         <AnimatePresence mode="wait">
-          {result && (
+          {state.kind === "not-found" && (
+            <motion.div
+              key="not-found"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mx-auto mt-14 flex max-w-md flex-col items-center rounded-2xl border border-black/10 bg-white p-8 text-center shadow-sm"
+            >
+              <AlertCircle className="h-8 w-8 text-magenta/60" />
+              <p className="mt-4 font-semibold text-ink">
+                We couldn't find that tracking number
+              </p>
+              <p className="mt-1.5 text-sm text-ink/55">
+                Double check the number we gave you, or ask us directly below.
+              </p>
+              <a
+                href={waLink(
+                  `Hello FSI Logistics, I couldn't find a status for tracking number ${submitted}.`
+                )}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-5 rounded-full bg-green px-5 py-2.5 text-xs font-semibold text-white"
+              >
+                Ask on WhatsApp
+              </a>
+            </motion.div>
+          )}
+
+          {state.kind === "cancelled" && (
+            <motion.div
+              key="cancelled"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mx-auto mt-14 flex max-w-md flex-col items-center rounded-2xl border border-black/10 bg-white p-8 text-center shadow-sm"
+            >
+              <AlertCircle className="h-8 w-8 text-magenta/60" />
+              <p className="mt-4 font-semibold text-ink">
+                This shipment was cancelled
+              </p>
+              <p className="mt-1.5 text-sm text-ink/55">
+                If this doesn't look right, reach out and we'll look into it.
+              </p>
+              <a
+                href={waLink(
+                  `Hello FSI Logistics, tracking number ${submitted} shows as cancelled — can you confirm what happened?`
+                )}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-5 rounded-full bg-green px-5 py-2.5 text-xs font-semibold text-white"
+              >
+                Ask on WhatsApp
+              </a>
+            </motion.div>
+          )}
+
+          {state.kind === "error" && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mx-auto mt-14 flex max-w-md flex-col items-center rounded-2xl border border-black/10 bg-white p-8 text-center shadow-sm"
+            >
+              <AlertCircle className="h-8 w-8 text-magenta/60" />
+              <p className="mt-4 font-semibold text-ink">
+                Something went wrong looking that up
+              </p>
+              <p className="mt-1.5 text-sm text-ink/55">{state.message}</p>
+            </motion.div>
+          )}
+
+          {state.kind === "found" && (
             <motion.div
               key={submitted}
               initial={{ opacity: 0, y: 20 }}
@@ -119,12 +250,14 @@ export default function Tracking() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="font-mono text-xs text-ink/40">{submitted}</p>
-                  <p className="mt-1 text-lg font-semibold text-ink">
-                    {result.route.from} → {result.route.to}
-                  </p>
+                  {state.data.carrierName && (
+                    <p className="mt-1 text-lg font-semibold text-ink">
+                      Shipping via {state.data.carrierName}
+                    </p>
+                  )}
                 </div>
                 <span className="rounded-full bg-green/10 px-4 py-1.5 text-xs font-semibold text-green">
-                  {STATUSES[result.stepIndex].label}
+                  {STATUSES[stageIndex].label}
                 </span>
               </div>
 
@@ -141,8 +274,8 @@ export default function Tracking() {
               {/* status timeline */}
               <div className="mt-9 space-y-5">
                 {STATUSES.map((status, i) => {
-                  const done = i < result.stepIndex;
-                  const current = i === result.stepIndex;
+                  const done = i < stageIndex;
+                  const current = i === stageIndex;
                   const Icon = status.icon;
                   return (
                     <motion.div
@@ -193,21 +326,72 @@ export default function Tracking() {
                 })}
               </div>
 
+              {/* Carrier-provided event history — confirmed real shape:
+                  each event has a description, location, and timestamp. */}
+              {state.data.events.length > 0 && (
+                <div className="mt-8 border-t border-black/10 pt-6">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink/40">
+                    Recent updates
+                  </p>
+                  <ul className="space-y-3">
+                    {state.data.events.map((evt, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start justify-between gap-3 text-xs text-ink/60"
+                      >
+                        <span>
+                          {evt.description || "Status update"}
+                          {evt.location ? ` — ${evt.location}` : ""}
+                        </span>
+                        {evt.createdAt && (
+                          <span className="shrink-0 text-ink/35">
+                            {new Date(evt.createdAt).toLocaleDateString(
+                              undefined,
+                              {
+                                month: "short",
+                                day: "numeric",
+                              }
+                            )}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="mt-9 flex flex-wrap items-center justify-between gap-4 border-t border-black/10 pt-6">
-                <p className="text-xs text-ink/40">
-                  Status shown here is illustrative — for exact live updates
-                  contact our team.
-                </p>
-                <a
-                  href={waLink(
-                    `Hello FSI Logistics, I'd like an update on my shipment ${submitted}.`
+                <div className="text-xs text-ink/40">
+                  <p>Status provided by our shipping partner network.</p>
+                  {state.data.carrierTrackingNumber && (
+                    <p className="mt-1 font-mono text-ink/50">
+                      Carrier tracking #: {state.data.carrierTrackingNumber}
+                    </p>
                   )}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 rounded-full bg-green px-5 py-2.5 text-xs font-semibold text-white"
-                >
-                  Ask on WhatsApp
-                </a>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {state.data.carrierTrackingUrl && (
+                    <a
+                      href={state.data.carrierTrackingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex shrink-0 items-center gap-1.5 rounded-full border border-black/15 px-5 py-2.5 text-xs font-semibold text-ink hover:border-black/30"
+                    >
+                      Track with {state.data.carrierName || "carrier"}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  <a
+                    href={waLink(
+                      `Hello FSI Logistics, I'd like an update on my shipment ${submitted}.`
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 rounded-full bg-green px-5 py-2.5 text-xs font-semibold text-white"
+                  >
+                    Ask on WhatsApp
+                  </a>
+                </div>
               </div>
             </motion.div>
           )}
