@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { waLink, WA_DEFAULT_MESSAGE } from "../../data/brand";
 
 export default function CtaBanner() {
   return (
@@ -21,15 +20,13 @@ export default function CtaBanner() {
             Get an instant estimate or talk to a real person on WhatsApp — whichever gets you moving faster.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <a
-              href={waLink(WA_DEFAULT_MESSAGE)}
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to="/booking"
               className="group flex items-center gap-2 rounded-full bg-magenta px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-magenta/25 transition-transform hover:scale-[1.03]"
             >
               Ship Now
               <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-            </a>
+            </Link>
             <Link
               to="/pricing"
               className="rounded-full border border-black/15 px-7 py-3.5 text-sm font-semibold text-ink/70 hover:border-black/30 hover:text-ink"

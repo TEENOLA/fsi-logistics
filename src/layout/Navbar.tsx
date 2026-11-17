@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowUpRight } from "lucide-react";
-import { NAV_LINKS, waLink, WA_DEFAULT_MESSAGE } from "../data/brand";
+import { NAV_LINKS } from "../data/brand";
+
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -49,15 +50,13 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <a
-            href={waLink(WA_DEFAULT_MESSAGE)}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            to="/booking"
             className="group flex items-center gap-1.5 rounded-full bg-magenta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-magenta-dark"
           >
             Ship Now
             <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </a>
+          </Link>
         </div>
 
         <button
@@ -93,14 +92,12 @@ export default function Navbar() {
                   {link.label}
                 </NavLink>
               ))}
-              <a
-                href={waLink(WA_DEFAULT_MESSAGE)}
-                target="_blank"
-                rel="noreferrer"
+              <Link
+                to="/booking"
                 className="mt-2 rounded-full bg-magenta px-5 py-3 text-center text-sm font-semibold text-white"
               >
                 Ship Now
-              </a>
+              </Link>
             </div>
           </motion.div>
         )}

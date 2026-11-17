@@ -1,3 +1,5 @@
+import { toInternationalPhone } from "../utils/phone";
+
 export const BRAND = {
   name: "FSI Logistics",
   tagline: "Fast. Safe. Reliable.",
@@ -26,10 +28,10 @@ export const HUB_ADDRESS = {
   phone: BRAND.phones[0].replace(/\s/g, ""),
   line1: "Shop A114, Ogba Shopping Mall",
   line2: "beside Sunday Market",
-  city: "Ogba",
+  city: "Ikeja",
   state: "Lagos",
   country: "NG",
-  zip: "",
+  zip: "100271",
 };
 
 // The pickup contact Terminal actually needs for a real booking is a
@@ -47,7 +49,9 @@ export function buildPickupContact(
     ...HUB_ADDRESS,
     first_name: firstName || HUB_ADDRESS.first_name,
     last_name: rest.join(" ") || HUB_ADDRESS.last_name,
-    phone: customerPhone || HUB_ADDRESS.phone,
+    phone: customerPhone
+      ? toInternationalPhone(customerPhone, HUB_ADDRESS.country)
+      : HUB_ADDRESS.phone,
   };
 }
 

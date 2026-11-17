@@ -53,27 +53,35 @@ export const handler: Handler = async (event) => {
   const authHeaders = { Authorization: `Bearer ${secretKey}` };
 
   try {
-    // Step 1: find the shipment by tracking number / reference.
-    const searchRes = await fetch(
-      `${TERMINAL_V2_BASE}/shipments?search=${encodeURIComponent(
-        trackingNumber
-      )}`,
-      { headers: authHeaders }
-    );
+    // Step 1: work out the Terminal shipment_id. Customers normally enter the
+    // carrier tracking number, which we search for. If they paste Terminal's
+    // own reference (SH-...), use it directly.
+    let shipmentId: string | undefined;
 
-    if (!searchRes.ok) {
-      return {
-        statusCode: 502,
-        body: JSON.stringify({
-          error: `Terminal search failed (${searchRes.status})`,
-        }),
-      };
+    if (/^SH-/i.test(trackingNumber)) {
+      shipmentId = trackingNumber.toUpperCase();
+    } else {
+      const searchRes = await fetch(
+        `${TERMINAL_V2_BASE}/shipments?search=${encodeURIComponent(
+          trackingNumber
+        )}`,
+        { headers: authHeaders }
+      );
+
+      if (!searchRes.ok) {
+        return {
+          statusCode: 502,
+          body: JSON.stringify({
+            error: `Terminal search failed (${searchRes.status})`,
+          }),
+        };
+      }
+
+      const searchData = await searchRes.json();
+      shipmentId = searchData?.data?.[0]?.shipment_id;
     }
 
-    const searchData = await searchRes.json();
-    const match = searchData?.data?.[0];
-
-    if (!match?.shipment_id) {
+    if (!shipmentId) {
       return {
         statusCode: 404,
         body: JSON.stringify({
@@ -87,19 +95,22 @@ export const handler: Handler = async (event) => {
     // `extras` object (carrier tracking link), which Track a Shipment
     // doesn't include.
     const [trackRes, shipmentRes] = await Promise.all([
-      fetch(`${TERMINAL_V1_BASE}/shipments/track/${match.shipment_id}`, {
+      fetch(`${TERMINAL_V1_BASE}/shipments/track/${shipmentId}`, {
         headers: authHeaders,
       }),
-      fetch(`${TERMINAL_V1_BASE}/shipments/${match.shipment_id}`, {
+      fetch(`${TERMINAL_V1_BASE}/shipments/${shipmentId}`, {
         headers: authHeaders,
       }),
     ]);
 
     if (!trackRes.ok) {
+      const isNotFound = trackRes.status === 404 || trackRes.status === 400;
       return {
-        statusCode: 502,
+        statusCode: isNotFound ? 404 : 502,
         body: JSON.stringify({
-          error: `Terminal tracking lookup failed (${trackRes.status})`,
+          error: isNotFound
+            ? "No shipment found for that tracking number"
+            : `Terminal tracking lookup failed (${trackRes.status})`,
         }),
       };
     }

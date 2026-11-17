@@ -44,15 +44,13 @@ export default function FloatingActions() {
 
       {/* Mobile sticky bottom bar */}
       <div className="fixed inset-x-0 bottom-0 z-40 flex border-t border-black/10 bg-white/95 backdrop-blur-md lg:hidden">
-        <a
-          href={waLink(WA_DEFAULT_MESSAGE)}
-          target="_blank"
-          rel="noreferrer"
+        <Link
+          to="/booking"
           className="flex flex-1 flex-col items-center gap-1 py-3 text-[11px] font-medium text-ink/60 active:bg-black/[0.03]"
         >
           <Send className="h-5 w-5 text-magenta" />
           Ship Now
-        </a>
+        </Link>
         <Link
           to="/tracking"
           className="flex flex-1 flex-col items-center gap-1 border-x border-black/10 py-3 text-[11px] font-medium text-ink/60 active:bg-black/[0.03]"

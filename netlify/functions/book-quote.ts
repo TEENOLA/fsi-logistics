@@ -12,6 +12,7 @@
 
 import type { Handler } from "@netlify/functions";
 import { buildPickupContact } from "../../src/data/brand";
+import { toInternationalPhone } from "../../src/utils/phone";
 
 const TERMINAL_V1_BASE =
   process.env.TERMINAL_API_BASE || "https://api.terminal.africa/v1";
@@ -104,7 +105,7 @@ export const handler: Handler = async (event) => {
           first_name: recipient.firstName,
           last_name: recipient.lastName,
           email: recipient.email,
-          phone: recipient.phone,
+          phone: toInternationalPhone(recipient.phone, recipient.country),
           line1: recipient.line1,
           line2: recipient.line2 || "",
           city: recipient.city,
@@ -114,6 +115,7 @@ export const handler: Handler = async (event) => {
         },
         parcel: {
           description: parcel.description || "Personal shipment",
+          weight_unit: "kg",
           items: [
             {
               description: parcel.description || "Personal shipment",
@@ -122,6 +124,7 @@ export const handler: Handler = async (event) => {
               value: parcel.value || 1,
               quantity: 1,
               weight: parcel.weight,
+              weight_unit: "kg",
             },
           ],
         },
